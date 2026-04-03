@@ -80,6 +80,7 @@ jobs:
           cp /tmp/aur/.SRCINFO packaging/aur/.SRCINFO
 
       - name: Push to AUR
+        shell: bash
         env:
           AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
         run: |
@@ -87,7 +88,16 @@ jobs:
           mkdir -p ~/.ssh
           echo "$AUR_SSH_PRIVATE_KEY" > ~/.ssh/aur
           chmod 600 ~/.ssh/aur
-          echo -e "Host aur.archlinux.org\n  IdentityFile ~/.ssh/aur\n  User aur\n  StrictHostKeyChecking no" > ~/.ssh/config
+
+          # Trust AUR host key
+          ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts
+
+          cat > ~/.ssh/config <<'EOF'
+          Host aur.archlinux.org
+            IdentityFile ~/.ssh/aur
+            User aur
+          EOF
+          chmod 600 ~/.ssh/config
 
           # Clone AUR repo, copy files, commit and push
           git clone ssh://aur@aur.archlinux.org/niri-display-manager.git /tmp/aur-repo
