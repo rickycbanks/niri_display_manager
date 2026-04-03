@@ -14,30 +14,33 @@ Item {
     signal clicked()
     signal moved(string name, int newX, int newY)
 
-    property real dragStartMouseX: 0
-    property real dragStartMouseY: 0
-    property int  dragStartPosX: 0
-    property int  dragStartPosY: 0
+    // ── Drag state ────────────────────────────────────────────────
     property bool isDragging: false
+    property real _dragDx: 0       // accumulated screen-space drag offset X
+    property real _dragDy: 0       // accumulated screen-space drag offset Y
+    property real _anchorSceneX: 0 // scene X of mouse at drag start
+    property real _anchorSceneY: 0 // scene Y of mouse at drag start
+    property int  _originLogX: 0   // logical pos_x at drag start
+    property int  _originLogY: 0   // logical pos_y at drag start
 
-    // Position and size on canvas
-    x: outputData.pos_x * fitScale + offsetX
-    y: outputData.pos_y * fitScale + offsetY
-    width: outputData.logical_width * fitScale
+    // ── Position and size ─────────────────────────────────────────
+    // During drag: shift visually by screen-space delta (don't touch outputData)
+    // On release: emit moved() once with final logical coords
+    x: outputData.pos_x * fitScale + offsetX + (isDragging ? _dragDx : 0)
+    y: outputData.pos_y * fitScale + offsetY + (isDragging ? _dragDy : 0)
+    width:  outputData.logical_width  * fitScale
     height: outputData.logical_height * fitScale
     visible: outputData.enabled
 
-    // Drop shadow
+    // ── Drop shadow ───────────────────────────────────────────────
     Rectangle {
         anchors { fill: parent; topMargin: 3; leftMargin: 3 }
-        color: "transparent"
         radius: Theme.radiusM
-        layer.enabled: true
-        layer.effect: null   // Placeholder for drop shadow
-        opacity: 0.3
-        Rectangle { anchors.fill: parent; color: "#000000"; radius: Theme.radiusM }
+        color: "#000000"
+        opacity: isDragging ? 0.4 : 0.2
     }
 
+    // ── Body ──────────────────────────────────────────────────────
     Rectangle {
         id: body
         anchors.fill: parent
@@ -50,7 +53,9 @@ Item {
         border.color: root.selected ? Theme.monitorBorderSelected : Theme.monitorBorder
         border.width: root.selected ? 2 : 1
 
-        // Monitor name label
+        // Drag indicator
+        opacity: isDragging ? 0.85 : 1.0
+
         Column {
             anchors.centerIn: parent
             spacing: 4
@@ -92,12 +97,7 @@ Item {
             radius: Theme.radiusM
             color: Qt.rgba(0, 0, 0, 0.45)
             visible: !outputData.enabled
-            Text {
-                anchors.centerIn: parent
-                text: "Off"
-                color: Theme.textSecondary
-                font.pixelSize: 12
-            }
+            Text { anchors.centerIn: parent; text: "Off"; color: Theme.textSecondary; font.pixelSize: 12 }
         }
 
         MouseArea {
@@ -108,27 +108,39 @@ Item {
 
             onPressed: function(mouse) {
                 root.clicked()
-                root.isDragging = false
-                root.dragStartMouseX = mouse.x + root.x
-                root.dragStartMouseY = mouse.y + root.y
-                root.dragStartPosX = outputData.pos_x
-                root.dragStartPosY = outputData.pos_y
+                // Map press position to scene coords as stable drag anchor
+                var scene = mapToItem(null, mouse.x, mouse.y)
+                root._anchorSceneX = scene.x
+                root._anchorSceneY = scene.y
+                root._originLogX = outputData.pos_x
+                root._originLogY = outputData.pos_y
+                root._dragDx = 0
+                root._dragDy = 0
+                root.isDragging = false  // set true only on actual movement
             }
 
             onPositionChanged: function(mouse) {
                 if (!pressed) return
+                var scene = mapToItem(null, mouse.x, mouse.y)
+                var dxScreen = scene.x - root._anchorSceneX
+                var dyScreen = scene.y - root._anchorSceneY
+                // Only start dragging after moving a few pixels
+                if (!root.isDragging && Math.abs(dxScreen) < 4 && Math.abs(dyScreen) < 4) return
                 root.isDragging = true
-                var globalX = mouse.x + root.x
-                var globalY = mouse.y + root.y
-                var dx = (globalX - root.dragStartMouseX) / root.fitScale
-                var dy = (globalY - root.dragStartMouseY) / root.fitScale
-                var newX = Math.round(root.dragStartPosX + dx)
-                var newY = Math.round(root.dragStartPosY + dy)
-                root.moved(outputData.name, newX, newY)
+                root._dragDx = dxScreen
+                root._dragDy = dyScreen
             }
 
-            onReleased: {
+            onReleased: function(mouse) {
+                if (root.isDragging) {
+                    // Convert final screen offset to logical coordinates
+                    var newX = root._originLogX + Math.round(root._dragDx / root.fitScale)
+                    var newY = root._originLogY + Math.round(root._dragDy / root.fitScale)
+                    root.moved(outputData.name, newX, newY)
+                }
                 root.isDragging = false
+                root._dragDx = 0
+                root._dragDy = 0
             }
         }
     }

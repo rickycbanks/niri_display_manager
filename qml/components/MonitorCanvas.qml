@@ -28,10 +28,12 @@ Item {
     property real _fitScale: {
         var usableW = width - padding * 2
         var usableH = height - padding * 2
-        if (_bounds.w <= 0 || _bounds.h <= 0) return 1
+        if (_bounds.w <= 0 || _bounds.h <= 0) return 0.1
         var sx = usableW / _bounds.w
         var sy = usableH / _bounds.h
-        return Math.min(sx, sy, 0.25)   // cap at 0.25x to keep monitors visible
+        // Use the smaller dimension to keep all monitors visible; cap at 0.25 max
+        // so very small layouts still look reasonable
+        return Math.min(sx, sy, 0.25)
     }
 
     // Center offset so monitors appear centered in the canvas
