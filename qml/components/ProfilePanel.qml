@@ -42,10 +42,9 @@ Rectangle {
                     color: Theme.textPrimary
                     selectionColor: Theme.accentGlow
                     font.pixelSize: Theme.fontSizeS
-                    placeholderText: "Profile name…"
                     Text {
                         visible: !nameField.text && !nameField.activeFocus
-                        text: nameField.placeholderText
+                        text: "Profile name…"
                         color: Theme.textDisabled
                         font.pixelSize: Theme.fontSizeS
                         anchors.verticalCenter: parent.verticalCenter

@@ -14,6 +14,8 @@ ApplicationWindow {
     title: "Niri Display Manager"
     color: Theme.bg
 
+    property bool profilePanelOpen: false
+
     // Error toast
     Popup {
         id: errorToast
@@ -84,18 +86,30 @@ ApplicationWindow {
                 id: monitorCanvas
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                onOutputSelected: function(name) {
-                    settingsPanel.outputName = name
-                    settingsPanel.outputData = DisplayBridge.outputs.find(
-                        function(o) { return o.name === name }
-                    ) || null
-                }
+            }
+
+            // Profile panel (collapsible)
+            ProfilePanel {
+                id: profilePanel
+                visible: profilePanelOpen
+                width: visible ? 220 : 0
+                Layout.fillHeight: true
             }
 
             MonitorSettings {
                 id: settingsPanel
                 width: 280
                 Layout.fillHeight: true
+                outputName: monitorCanvas.selectedOutput
+                // Reactive binding: auto-updates whenever outputsChanged fires
+                outputData: {
+                    if (!monitorCanvas.selectedOutput) return null
+                    var outputs = DisplayBridge.outputs
+                    for (var i = 0; i < outputs.length; i++) {
+                        if (outputs[i].name === monitorCanvas.selectedOutput) return outputs[i]
+                    }
+                    return null
+                }
             }
         }
 
@@ -113,12 +127,14 @@ ApplicationWindow {
             Layout.fillWidth: true
             spacing: Theme.spacingS
 
-            // Profiles button (placeholder for Phase 7)
+            // Profiles toggle button
             Button {
-                text: "Profiles"
+                text: profilePanelOpen ? "✕ Profiles" : "☰ Profiles"
                 flat: true
+                onClicked: profilePanelOpen = !profilePanelOpen
                 contentItem: Text {
-                    text: parent.text; color: Theme.textSecondary
+                    text: parent.text
+                    color: profilePanelOpen ? Theme.accent : Theme.textSecondary
                     font.pixelSize: Theme.fontSizeM
                     horizontalAlignment: Text.AlignHCenter
                     verticalAlignment: Text.AlignVCenter
