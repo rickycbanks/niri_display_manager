@@ -8,6 +8,7 @@ license = { text = "MIT" }
 keywords = ["niri", "wayland", "display", "monitor"]
 dependencies = [
     "pyside6>=6.11.0",
+    "pyudev>=0.24.4",
 ]
 
 [project.scripts]

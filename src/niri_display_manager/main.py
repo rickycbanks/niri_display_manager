@@ -69,14 +69,18 @@ def _run_gui() -> None:
 
 
 def _run_daemon() -> None:
-    from niri_display_manager.daemon.hotplug import HotplugDaemon
-
-    daemon = HotplugDaemon()
-    daemon.run()
+    from niri_display_manager.daemon.hotplug import run_daemon
+    run_daemon()
 
 
 def _apply_profile(name: str) -> None:
-    from niri_display_manager.config.profile_manager import ProfileManager
+    from niri_display_manager.config import profile_manager as pm
+    from niri_display_manager.daemon.hotplug import _apply_profile as apply_profile
+    from niri_display_manager.ipc.niri_socket import get_outputs
 
-    manager = ProfileManager()
-    manager.apply(name)
+    try:
+        outputs = get_outputs()
+        apply_profile(name, outputs)
+    except Exception as e:
+        print(f"Error applying profile '{name}': {e}", file=sys.stderr)
+        sys.exit(1)

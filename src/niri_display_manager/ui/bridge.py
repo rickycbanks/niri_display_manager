@@ -41,6 +41,7 @@ from niri_display_manager.ipc.niri_socket import (
 )
 from niri_display_manager.config.kdl_finder import find_output_file
 from niri_display_manager.config.kdl_parser import KdlOutputFile, KdlOutputBlock
+from niri_display_manager.config import profile_manager as pm
 
 
 QML_IMPORT_NAME = "NiriDisplayManager"
@@ -72,6 +73,7 @@ class DisplayBridge(QObject):
     errorMessageChanged = Signal()
     previewActiveChanged = Signal()
     previewSecondsLeftChanged = Signal()
+    profileNamesChanged = Signal()
 
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
@@ -114,6 +116,10 @@ class DisplayBridge(QObject):
     @Property(int, notify=previewSecondsLeftChanged)
     def previewSecondsLeft(self) -> int:
         return self._preview_seconds_left
+
+    @Property(list, notify=profileNamesChanged)
+    def profileNames(self) -> list:
+        return pm.list_profiles()
 
     # ------------------------------------------------------------------
     # Slots — called from QML
@@ -267,6 +273,55 @@ class DisplayBridge(QObject):
     @Slot(result=list)
     def getTransformOptions(self) -> list:
         return [{"value": t, "label": TRANSFORM_LABELS.get(t, t)} for t in TRANSFORMS]
+
+    @Slot(str)
+    def saveProfile(self, name: str) -> None:
+        """Save the current staged configuration as a named profile."""
+        self._clear_error()
+        try:
+            pm.save_profile(name, self._staged)
+            self.profileNamesChanged.emit()
+        except Exception as e:
+            self._set_error(f"Save profile failed: {e}")
+
+    @Slot(str)
+    def loadProfile(self, name: str) -> None:
+        """Load a saved profile into the staged configuration."""
+        self._clear_error()
+        try:
+            profile = pm.load_profile(name)
+            self._staged = pm.apply_profile_to_staged(profile, self._staged)
+            self._set_has_changes(True)
+            self.outputsChanged.emit()
+        except Exception as e:
+            self._set_error(f"Load profile failed: {e}")
+
+    @Slot(str)
+    def deleteProfile(self, name: str) -> None:
+        """Delete a saved profile."""
+        self._clear_error()
+        try:
+            pm.delete_profile(name)
+            self.profileNamesChanged.emit()
+        except Exception as e:
+            self._set_error(f"Delete profile failed: {e}")
+
+    @Slot(str, str)
+    def renameProfile(self, old_name: str, new_name: str) -> None:
+        """Rename a saved profile."""
+        self._clear_error()
+        try:
+            pm.rename_profile(old_name, new_name)
+            self.profileNamesChanged.emit()
+        except Exception as e:
+            self._set_error(f"Rename profile failed: {e}")
+
+    @Slot(result=str)
+    def findAutoProfile(self) -> str:
+        """Return the name of a matching auto-profile, or empty string."""
+        names = list(self._live_outputs.keys())
+        result = pm.find_auto_profile(names)
+        return result or ""
 
     # ------------------------------------------------------------------
     # Internal helpers
