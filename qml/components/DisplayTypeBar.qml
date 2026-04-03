@@ -7,29 +7,19 @@ RowLayout {
     id: root
     spacing: Theme.spacingS
 
-    Text {
-        text: "Display Mode:"
-        color: Theme.textSecondary
-        font.pixelSize: Theme.fontSizeS
-        verticalAlignment: Text.AlignVCenter
-    }
-
-    Repeater {
-        model: [
-            { value: "extend", label: "Extended", tooltip: "Each monitor shows a different part of the desktop" },
-            { value: "clone",  label: "Clone",    tooltip: "All monitors show the same content" },
-        ]
-        delegate: ModeButton {
-            required property var modelData
-            label:  modelData.label
-            active: DisplayBridge.displayMode === modelData.value
-            onClicked: DisplayBridge.setDisplayMode(modelData.value)
-        }
-    }
+    // Snap-to-grid state — toggled by the button; read by MonitorCanvas
+    property bool snapToGrid: false
 
     Item { Layout.fillWidth: true }
 
-    // Identify button
+    // Snap toggle
+    ModeButton {
+        label:  root.snapToGrid ? "⊞ Snap: On" : "⊟ Snap: Off"
+        active: root.snapToGrid
+        onClicked: root.snapToGrid = !root.snapToGrid
+    }
+
+    // Identify monitors button
     Button {
         text: "Identify Monitors"
         onClicked: {

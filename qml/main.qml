@@ -72,6 +72,7 @@ ApplicationWindow {
 
         // ── Display Type Bar ─────────────────────────────────────────
         DisplayTypeBar {
+            id: displayTypeBar
             Layout.fillWidth: true
         }
 
@@ -85,6 +86,7 @@ ApplicationWindow {
                 id: monitorCanvas
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                snapToGrid: displayTypeBar.snapToGrid
             }
 
             // Profile panel (collapsible)

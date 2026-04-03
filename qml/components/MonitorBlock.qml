@@ -10,9 +10,13 @@ Item {
     required property real fitScale
     required property real offsetX
     required property real offsetY
+    property bool snapToGrid: false
+    property int  gridSize:   10
 
     signal clicked()
     signal moved(string name, int newX, int newY)
+    signal dragStarted()
+    signal dragEnded()
 
     // ── Drag state ────────────────────────────────────────────────
     property bool isDragging: false
@@ -128,6 +132,7 @@ Item {
                 var dyScreen = scene.y - root._anchorSceneY
                 // Only start dragging after moving a few pixels
                 if (!root.isDragging && Math.abs(dxScreen) < 4 && Math.abs(dyScreen) < 4) return
+                if (!root.isDragging) root.dragStarted()
                 root.isDragging = true
                 root._dragDx = dxScreen
                 root._dragDy = dyScreen
@@ -138,7 +143,12 @@ Item {
                     // Convert final screen offset to logical coordinates
                     var newX = root._originLogX + Math.round(root._dragDx / root.fitScale)
                     var newY = root._originLogY + Math.round(root._dragDy / root.fitScale)
+                    if (root.snapToGrid) {
+                        newX = Math.round(newX / root.gridSize) * root.gridSize
+                        newY = Math.round(newY / root.gridSize) * root.gridSize
+                    }
                     root.moved(outputData.name, newX, newY)
+                    root.dragEnded()
                 }
                 root.isDragging = false
                 root._dragDx = 0
