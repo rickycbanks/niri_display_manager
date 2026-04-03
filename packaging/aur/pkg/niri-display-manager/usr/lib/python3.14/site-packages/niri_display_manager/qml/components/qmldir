@@ -1,0 +1,7 @@
+MonitorCanvas 1.0 MonitorCanvas.qml
+MonitorBlock 1.0 MonitorBlock.qml
+MonitorSettings 1.0 MonitorSettings.qml
+DisplayTypeBar 1.0 DisplayTypeBar.qml
+ProfilePanel 1.0 ProfilePanel.qml
+PreviewBanner 1.0 PreviewBanner.qml
+MonitorIdOverlay 1.0 MonitorIdOverlay.qml

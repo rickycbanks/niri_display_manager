@@ -54,10 +54,8 @@ def _run_gui() -> None:
     theme = ThemeBridge()
     engine = QQmlApplicationEngine()
 
-    # Locate QML files: prefer the installed data directory, fall back to dev layout
-    _installed_qml = Path("/usr/share/niri-display-manager/qml")
-    _dev_qml = Path(__file__).parent.parent.parent / "qml"
-    qml_dir = _installed_qml if _installed_qml.exists() else _dev_qml
+    # Register QML module paths
+    qml_dir = Path(__file__).parent.parent.parent / "qml"
     engine.addImportPath(str(qml_dir))
 
     # Expose bridge and theme to QML as context properties

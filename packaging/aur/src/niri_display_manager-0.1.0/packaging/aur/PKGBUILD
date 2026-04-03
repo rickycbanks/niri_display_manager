@@ -31,9 +31,10 @@ package() {
     cd "niri_display_manager-$pkgver"
     python -m installer --destdir="$pkgdir" dist/*.whl
 
-    # QML files → standard data directory
-    install -dm755 "$pkgdir/usr/share/niri-display-manager"
-    cp -r qml "$pkgdir/usr/share/niri-display-manager/"
+    # QML files (installed alongside the Python package)
+    _site=$(python -c "import site; print(site.getsitepackages()[0])")
+    install -dm755 "$pkgdir/$_site/niri_display_manager"
+    cp -r qml "$pkgdir/$_site/niri_display_manager/"
 
     # Desktop entry
     install -Dm644 packaging/flatpak/io.github.rickycbanks.NiriDisplayManager.desktop \

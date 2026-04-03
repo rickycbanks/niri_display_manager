@@ -1,0 +1,46 @@
+{
+    "app-id": "io.github.rickycbanks.NiriDisplayManager",
+    "runtime": "org.kde.Platform",
+    "runtime-version": "6.7",
+    "sdk": "org.kde.Sdk",
+    "command": "niri-display-manager",
+    "finish-args": [
+        "--socket=wayland",
+        "--filesystem=xdg-run/niri",
+        "--filesystem=xdg-config/niri:rw",
+        "--env=NIRI_SOCKET=/run/user/1000/niri/socket"
+    ],
+    "modules": [
+        {
+            "name": "pyudev",
+            "buildsystem": "simple",
+            "build-commands": [
+                "pip3 install --no-index --find-links=. --prefix=${FLATPAK_DEST} pyudev"
+            ],
+            "sources": [
+                {
+                    "type": "file",
+                    "url": "https://files.pythonhosted.org/packages/source/p/pyudev/pyudev-0.24.3.tar.gz",
+                    "sha256": "FILLME"
+                }
+            ]
+        },
+        {
+            "name": "niri-display-manager",
+            "buildsystem": "simple",
+            "build-commands": [
+                "pip3 install --no-index --find-links=. --prefix=${FLATPAK_DEST} .",
+                "install -Dm755 niri-display-manager.sh ${FLATPAK_DEST}/bin/niri-display-manager",
+                "cp -r qml ${FLATPAK_DEST}/lib/python3.12/site-packages/niri_display_manager/",
+                "install -Dm644 packaging/flatpak/io.github.rickycbanks.NiriDisplayManager.desktop ${FLATPAK_DEST}/share/applications/io.github.rickycbanks.NiriDisplayManager.desktop",
+                "install -Dm644 assets/icons/niri-display-manager.svg ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.github.rickycbanks.NiriDisplayManager.svg"
+            ],
+            "sources": [
+                {
+                    "type": "dir",
+                    "path": "../.."
+                }
+            ]
+        }
+    ]
+}

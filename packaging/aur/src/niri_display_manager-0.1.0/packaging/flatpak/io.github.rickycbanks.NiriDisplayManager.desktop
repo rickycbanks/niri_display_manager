@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Niri Display Manager
+Comment=GUI display manager for the Niri Wayland window manager
+Exec=niri-display-manager
+Icon=io.github.rickycbanks.NiriDisplayManager
+Type=Application
+Categories=Settings;HardwareSettings;
+Keywords=display;monitor;resolution;niri;wayland;
+StartupNotify=true

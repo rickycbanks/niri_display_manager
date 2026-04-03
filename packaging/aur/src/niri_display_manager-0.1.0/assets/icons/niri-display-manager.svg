@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- Monitor 1 (left) -->
+  <rect x="2" y="14" width="28" height="20" rx="3" fill="#211f30" stroke="#7c6af0" stroke-width="2"/>
+  <rect x="4" y="16" width="24" height="16" rx="1" fill="#2a2840"/>
+  <rect x="14" y="34" width="6" height="4" fill="#2e2b45"/>
+  <rect x="10" y="38" width="14" height="2" rx="1" fill="#2e2b45"/>
+
+  <!-- Monitor 2 (right, larger) -->
+  <rect x="34" y="10" width="28" height="22" rx="3" fill="#211f30" stroke="#7c6af0" stroke-width="2"/>
+  <rect x="36" y="12" width="24" height="18" rx="1" fill="#2a2840"/>
+  <rect x="46" y="32" width="6" height="4" fill="#2e2b45"/>
+  <rect x="42" y="36" width="14" height="2" rx="1" fill="#2e2b45"/>
+
+  <!-- Accent dots (active indicators) -->
+  <circle cx="16" cy="24" r="3" fill="#7c6af0" opacity="0.8"/>
+  <circle cx="48" cy="21" r="3" fill="#9d8ff5" opacity="0.9"/>
+</svg>
