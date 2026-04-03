@@ -75,6 +75,8 @@ class DisplayBridge(QObject):
     previewSecondsLeftChanged = Signal()
     profileNamesChanged = Signal()
 
+    # displayMode is derived from output positions; re-read via outputsChanged
+
     def __init__(self, parent: QObject | None = None) -> None:
         super().__init__(parent)
         self._live_outputs: dict[str, Output] = {}
@@ -120,6 +122,21 @@ class DisplayBridge(QObject):
     @Property(list, notify=profileNamesChanged)
     def profileNames(self) -> list:
         return pm.list_profiles()
+
+    @Property(str, notify=outputsChanged)
+    def displayMode(self) -> str:
+        """
+        'clone'  — all enabled outputs share the same position
+        'extend' — outputs are at different positions (default)
+        """
+        enabled_positions = [
+            (s["pos_x"], s["pos_y"])
+            for s in self._staged.values()
+            if s.get("enabled", True)
+        ]
+        if len(enabled_positions) >= 2 and len(set(enabled_positions)) == 1:
+            return "clone"
+        return "extend"
 
     # ------------------------------------------------------------------
     # Slots — called from QML
@@ -185,13 +202,37 @@ class DisplayBridge(QObject):
         self._set_has_changes(True)
         self.outputsChanged.emit()
 
-    @Slot(str, str)
-    def setDisplayType(self, output_name: str, display_type: str) -> None:
+    @Slot(str)
+    def setDisplayMode(self, mode: str) -> None:
         """
-        Set the display type for an output.
-        Values: "extend", "mirror:<target>", "single", "disabled"
+        Set the global display arrangement mode.
+
+        'clone'  — place all enabled outputs at (0, 0) with matching scale/mode
+        'extend' — arrange enabled outputs side by side from left to right
         """
-        self._stage(output_name, "display_type", display_type)
+        enabled = [
+            name for name, s in self._staged.items() if s.get("enabled", True)
+        ]
+        if not enabled:
+            return
+
+        if mode == "clone":
+            for name in enabled:
+                self._staged[name]["pos_x"] = 0
+                self._staged[name]["pos_y"] = 0
+        elif mode == "extend":
+            # Sort by current x position to preserve intended order
+            sorted_names = sorted(
+                enabled, key=lambda n: self._staged[n].get("pos_x", 0)
+            )
+            x = 0
+            for name in sorted_names:
+                self._staged[name]["pos_x"] = x
+                self._staged[name]["pos_y"] = 0
+                x += self._staged[name].get("logical_width", 1920)
+
+        self._set_has_changes(True)
+        self.outputsChanged.emit()
 
     @Slot()
     def applyChanges(self) -> None:

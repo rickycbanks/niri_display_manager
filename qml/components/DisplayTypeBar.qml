@@ -7,32 +7,23 @@ RowLayout {
     id: root
     spacing: Theme.spacingS
 
-    property string selectedOutput: ""
-
     Text {
         text: "Display Mode:"
         color: Theme.textSecondary
         font.pixelSize: Theme.fontSizeS
+        verticalAlignment: Text.AlignVCenter
     }
 
     Repeater {
         model: [
-            { value: "extend",   label: "Extend",  icon: "⬛⬜" },
-            { value: "mirror",   label: "Mirror",  icon: "⬛⬛" },
-            { value: "single",   label: "Single",  icon: "⬛"   },
+            { value: "extend", label: "Extended", tooltip: "Each monitor shows a different part of the desktop" },
+            { value: "clone",  label: "Clone",    tooltip: "All monitors show the same content" },
         ]
         delegate: ModeButton {
-            label: modelData.label
-            icon: modelData.icon
-            active: {
-                if (!selectedOutput) return false
-                var out = DisplayBridge.outputs.find(function(o) { return o.name === selectedOutput })
-                return out ? (out.display_type === modelData.value) : false
-            }
-            onClicked: {
-                if (selectedOutput)
-                    DisplayBridge.setDisplayType(selectedOutput, modelData.value)
-            }
+            required property var modelData
+            label:  modelData.label
+            active: DisplayBridge.displayMode === modelData.value
+            onClicked: DisplayBridge.setDisplayMode(modelData.value)
         }
     }
 
@@ -52,7 +43,7 @@ RowLayout {
                             outputIndex: i + 1,
                             posX: o.pos_x,
                             posY: o.pos_y,
-                            outWidth: o.logical_width,
+                            outWidth:  o.logical_width,
                             outHeight: o.logical_height,
                         })
                     }
@@ -74,7 +65,6 @@ RowLayout {
 
     component ModeButton: Rectangle {
         property string label: ""
-        property string icon: ""
         property bool active: false
         signal clicked()
 

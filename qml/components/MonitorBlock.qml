@@ -30,7 +30,9 @@ Item {
     y: outputData.pos_y * fitScale + offsetY + (isDragging ? _dragDy : 0)
     width:  outputData.logical_width  * fitScale
     height: outputData.logical_height * fitScale
-    visible: outputData.enabled
+    // Always visible — disabled monitors show faded so they can be re-enabled
+    visible: true
+    opacity: outputData.enabled ? 1.0 : 0.45
 
     // ── Drop shadow ───────────────────────────────────────────────
     Rectangle {
@@ -91,7 +93,7 @@ Item {
             }
         }
 
-        // Disabled overlay
+        // Disabled overlay — no MouseArea, so clicks pass through to the body's MouseArea
         Rectangle {
             anchors.fill: parent
             radius: Theme.radiusM

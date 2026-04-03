@@ -73,7 +73,6 @@ ApplicationWindow {
         // ── Display Type Bar ─────────────────────────────────────────
         DisplayTypeBar {
             Layout.fillWidth: true
-            selectedOutput: monitorCanvas.selectedOutput
         }
 
         // ── Main area: canvas + settings ────────────────────────────
