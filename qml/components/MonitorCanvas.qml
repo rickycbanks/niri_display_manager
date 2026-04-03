@@ -6,15 +6,14 @@ Item {
     id: root
 
     property string selectedOutput: ""
-    // Snap-to-grid: when true, released position is rounded to gridSize logical px
     property bool snapToGrid: false
-    property int  gridSize:   10
+    property int  gridSize:   100   // logical pixels per snap step
 
     readonly property int padding: 40
 
     signal outputSelected(string name)
 
-    // ── Bounds of all outputs (enabled + disabled) ─────────────────
+    // ── Bounds of all outputs ──────────────────────────────────────
     property var _bounds: {
         var minX = 0, minY = 0, maxX = 1, maxY = 1
         for (var i = 0; i < DisplayBridge.outputs.length; i++) {
@@ -27,7 +26,6 @@ Item {
         return { minX: minX, minY: minY, w: maxX - minX, h: maxY - minY }
     }
 
-    // Scale to fit the current arrangement in the visible viewport
     property real _fitScale: {
         var usableW = width  - padding * 2
         var usableH = height - padding * 2
@@ -37,18 +35,12 @@ Item {
         return Math.min(sx, sy, 0.25)
     }
 
-    // Content area — large enough to scroll around comfortably
     property real _contentW: Math.max(width  * 2.5, _bounds.w * _fitScale + padding * 8)
     property real _contentH: Math.max(height * 2.5, _bounds.h * _fitScale + padding * 8)
-
-    // Offset so monitors are centred inside the content area
     property real _offsetX: (_contentW - _bounds.w * _fitScale) / 2 - _bounds.minX * _fitScale
     property real _offsetY: (_contentH - _bounds.h * _fitScale) / 2 - _bounds.minY * _fitScale
 
-    // Track whether any block is currently being dragged (disables Flickable while dragging)
-    property int _draggingCount: 0
-
-    // ── Background (fixed, not scrolled) ───────────────────────────
+    // ── Background (fixed — not scrolled) ─────────────────────────
     Rectangle {
         anchors.fill: parent
         color: Theme.bgCard
@@ -56,17 +48,49 @@ Item {
         clip: true
 
         Canvas {
+            id: bgCanvas
             anchors.fill: parent
+
+            // Repaint when snap mode toggles
+            property bool _snap: root.snapToGrid
+            on_SnapChanged: requestPaint()
+
             onPaint: {
                 var ctx = getContext("2d")
                 ctx.clearRect(0, 0, width, height)
-                ctx.fillStyle = Theme.border
                 var step = 24
-                for (var x = step; x < width; x += step) {
+
+                if (root.snapToGrid) {
+                    // Grid lines — clearly shows snap mode is active
+                    ctx.strokeStyle = Qt.rgba(
+                        parseFloat(Theme.border.toString().slice(1,3), 16) / 255,
+                        parseFloat(Theme.border.toString().slice(3,5), 16) / 255,
+                        parseFloat(Theme.border.toString().slice(5,7), 16) / 255,
+                        0.55)
+                    // Simpler: use a semi-transparent border colour
+                    ctx.strokeStyle = Theme.border
+                    ctx.globalAlpha = 0.35
+                    ctx.lineWidth = 0.5
+                    ctx.beginPath()
+                    for (var x = step; x < width; x += step) {
+                        ctx.moveTo(x, 0)
+                        ctx.lineTo(x, height)
+                    }
                     for (var y = step; y < height; y += step) {
-                        ctx.beginPath()
-                        ctx.arc(x, y, 1, 0, Math.PI * 2)
-                        ctx.fill()
+                        ctx.moveTo(0, y)
+                        ctx.lineTo(width, y)
+                    }
+                    ctx.stroke()
+                    ctx.globalAlpha = 1.0
+                } else {
+                    // Dot pattern — freeform mode
+                    ctx.fillStyle = Theme.border
+                    for (var dx = step; dx < width; dx += step) {
+                        for (var dy = step; dy < height; dy += step) {
+                            ctx.beginPath()
+                            ctx.arc(dx, dy, 1, 0, Math.PI * 2)
+                            ctx.fill()
+                        }
                     }
                 }
             }
@@ -82,14 +106,13 @@ Item {
         contentWidth:  root._contentW
         contentHeight: root._contentH
 
-        // Disable flick while the user is dragging a monitor block
-        interactive: root._draggingCount === 0
+        // Always interactive — MonitorBlock MouseAreas use preventStealing
+        // to take over when an intentional drag is detected.
+        interactive: true
 
-        // Smooth deceleration for panning feel
         flickDeceleration: 1500
         maximumFlickVelocity: 2500
 
-        // Centre on the monitors when layout changes (e.g. on load or refresh)
         function centerOnMonitors() {
             var cx = (_contentW - width)  / 2
             var cy = (_contentH - height) / 2
@@ -100,7 +123,6 @@ Item {
         onContentWidthChanged:  Qt.callLater(centerOnMonitors)
         onContentHeightChanged: Qt.callLater(centerOnMonitors)
 
-        // Monitor blocks live inside the scrollable content item
         Item {
             width:  flickable.contentWidth
             height: flickable.contentHeight
@@ -120,50 +142,69 @@ Item {
                     onClicked: {
                         root.selectedOutput = outputData.name
                         root.outputSelected(outputData.name)
+                        root.forceActiveFocus()
                     }
                     onMoved: function(name, nx, ny) {
                         DisplayBridge.setPosition(name, nx, ny)
                     }
-                    onDragStarted: root._draggingCount++
-                    onDragEnded:   root._draggingCount = Math.max(0, root._draggingCount - 1)
                 }
             }
         }
     }
 
-    // Scroll-position hint — faint arrows at edges when content is larger than viewport
+    // ── Keyboard: arrow keys move selected monitor, Esc deselects ──
+    focus: true
+    Keys.onPressed: function(event) {
+        if (event.key === Qt.Key_Escape) {
+            root.selectedOutput = ""
+            event.accepted = true
+            return
+        }
+        if (root.selectedOutput === "") return
+        var step = root.snapToGrid ? root.gridSize : 1
+        var dx = 0, dy = 0
+        switch (event.key) {
+            case Qt.Key_Left:  dx = -step; break
+            case Qt.Key_Right: dx =  step; break
+            case Qt.Key_Up:    dy = -step; break
+            case Qt.Key_Down:  dy =  step; break
+            default: return
+        }
+        var outs = DisplayBridge.outputs
+        for (var i = 0; i < outs.length; i++) {
+            if (outs[i].name === root.selectedOutput) {
+                DisplayBridge.setPosition(outs[i].name, outs[i].pos_x + dx, outs[i].pos_y + dy)
+                event.accepted = true
+                return
+            }
+        }
+    }
+
+    // ── Scroll-position hints ──────────────────────────────────────
     Item {
         anchors.fill: parent
-        // Left hint
         Rectangle {
-            visible: flickable.contentX > 0
+            visible: flickable.contentX > 1
             anchors { left: parent.left; verticalCenter: parent.verticalCenter }
-            width: 20; height: 48; radius: 4
-            color: Qt.rgba(0,0,0,0.18)
+            width: 20; height: 48; radius: 4; color: Qt.rgba(0,0,0,0.18)
             Text { anchors.centerIn: parent; text: "‹"; color: Theme.textSecondary; font.pixelSize: 18 }
         }
-        // Right hint
         Rectangle {
             visible: flickable.contentX < flickable.contentWidth - flickable.width - 1
             anchors { right: parent.right; verticalCenter: parent.verticalCenter }
-            width: 20; height: 48; radius: 4
-            color: Qt.rgba(0,0,0,0.18)
+            width: 20; height: 48; radius: 4; color: Qt.rgba(0,0,0,0.18)
             Text { anchors.centerIn: parent; text: "›"; color: Theme.textSecondary; font.pixelSize: 18 }
         }
-        // Top hint
         Rectangle {
-            visible: flickable.contentY > 0
+            visible: flickable.contentY > 1
             anchors { top: parent.top; horizontalCenter: parent.horizontalCenter }
-            width: 48; height: 20; radius: 4
-            color: Qt.rgba(0,0,0,0.18)
+            width: 48; height: 20; radius: 4; color: Qt.rgba(0,0,0,0.18)
             Text { anchors.centerIn: parent; text: "⌃"; color: Theme.textSecondary; font.pixelSize: 14 }
         }
-        // Bottom hint
         Rectangle {
             visible: flickable.contentY < flickable.contentHeight - flickable.height - 1
             anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter }
-            width: 48; height: 20; radius: 4
-            color: Qt.rgba(0,0,0,0.18)
+            width: 48; height: 20; radius: 4; color: Qt.rgba(0,0,0,0.18)
             Text { anchors.centerIn: parent; text: "⌄"; color: Theme.textSecondary; font.pixelSize: 14 }
         }
     }

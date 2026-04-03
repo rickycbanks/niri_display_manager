@@ -15,8 +15,6 @@ Item {
 
     signal clicked()
     signal moved(string name, int newX, int newY)
-    signal dragStarted()
-    signal dragEnded()
 
     // ── Drag state ────────────────────────────────────────────────
     property bool isDragging: false
@@ -111,10 +109,13 @@ Item {
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: root.isDragging ? Qt.ClosedHandCursor : Qt.OpenHandCursor
+            // Allow the parent Flickable to detect swipe gestures over monitor blocks.
+            // When an intentional drag is detected (see onPositionChanged), we set
+            // preventStealing=true so the Flickable can't reclaim the gesture.
+            preventStealing: false
 
             onPressed: function(mouse) {
                 root.clicked()
-                // Map press position to scene coords as stable drag anchor
                 var scene = mapToItem(null, mouse.x, mouse.y)
                 root._anchorSceneX = scene.x
                 root._anchorSceneY = scene.y
@@ -122,7 +123,7 @@ Item {
                 root._originLogY = outputData.pos_y
                 root._dragDx = 0
                 root._dragDy = 0
-                root.isDragging = false  // set true only on actual movement
+                root.isDragging = false
             }
 
             onPositionChanged: function(mouse) {
@@ -130,17 +131,19 @@ Item {
                 var scene = mapToItem(null, mouse.x, mouse.y)
                 var dxScreen = scene.x - root._anchorSceneX
                 var dyScreen = scene.y - root._anchorSceneY
-                // Only start dragging after moving a few pixels
                 if (!root.isDragging && Math.abs(dxScreen) < 4 && Math.abs(dyScreen) < 4) return
-                if (!root.isDragging) root.dragStarted()
+                if (!root.isDragging) {
+                    // Lock the Flickable out so it doesn't scroll while we drag
+                    mouseArea.preventStealing = true
+                }
                 root.isDragging = true
                 root._dragDx = dxScreen
                 root._dragDy = dyScreen
             }
 
             onReleased: function(mouse) {
+                mouseArea.preventStealing = false
                 if (root.isDragging) {
-                    // Convert final screen offset to logical coordinates
                     var newX = root._originLogX + Math.round(root._dragDx / root.fitScale)
                     var newY = root._originLogY + Math.round(root._dragDy / root.fitScale)
                     if (root.snapToGrid) {
@@ -148,7 +151,6 @@ Item {
                         newY = Math.round(newY / root.gridSize) * root.gridSize
                     }
                     root.moved(outputData.name, newX, newY)
-                    root.dragEnded()
                 }
                 root.isDragging = false
                 root._dragDx = 0

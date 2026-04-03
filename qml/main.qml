@@ -16,6 +16,9 @@ ApplicationWindow {
 
     property bool profilePanelOpen: false
 
+    // Give the canvas keyboard focus by default so arrow keys work immediately.
+    Component.onCompleted: monitorCanvas.forceActiveFocus()
+
     // Error toast
     Popup {
         id: errorToast
