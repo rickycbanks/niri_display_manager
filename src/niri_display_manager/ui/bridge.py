@@ -164,12 +164,24 @@ class DisplayBridge(QObject):
             name: self._output_to_dict(out)
             for name, out in self._live_outputs.items()
         }
+
+        # Position disabled monitors to the right of all enabled monitors
+        # so they appear on the canvas without overlapping active outputs.
+        self._park_disabled_outputs()
+
         self._set_has_changes(False)
         self.outputsChanged.emit()
 
     @Slot(str, bool)
     def setEnabled(self, output_name: str, enabled: bool) -> None:
-        self._stage(output_name, "enabled", enabled)
+        if output_name not in self._staged:
+            return
+        self._staged[output_name]["enabled"] = enabled
+        # Update logical size from preferred mode when re-enabling
+        # (size might have been set from fallback; keep as-is since it's already correct)
+        self._set_has_changes(True)
+        self._park_disabled_outputs()
+        self.outputsChanged.emit()
 
     @Slot(str, int)
     def setModeIndex(self, output_name: str, mode_index: int) -> None:
@@ -400,9 +412,39 @@ class DisplayBridge(QObject):
         self._preview_active = False
         self.previewActiveChanged.emit()
 
+    def _park_disabled_outputs(self) -> None:
+        """
+        Position disabled outputs to the right of all enabled outputs on the canvas.
+        This gives them a visible location so the user can click them to re-enable.
+        Does NOT set hasChanges — this is purely a visual placement.
+        """
+        # Find the rightmost edge of all enabled outputs
+        right_edge = max(
+            (s["pos_x"] + s["logical_width"]
+             for s in self._staged.values() if s.get("enabled", True)),
+            default=0,
+        )
+        gap = 40  # visual gap between enabled and disabled group
+        x = right_edge + gap
+        for s in self._staged.values():
+            if not s.get("enabled", True) and s.get("pos_x", 0) == 0 and s.get("pos_y", 0) == 0:
+                s["pos_x"] = x
+                s["pos_y"] = 0
+                x += s.get("logical_width", 1920) + gap
+
     def _output_to_dict(self, output: Output) -> dict:
         logical = output.logical
         mode = output.current_output_mode
+
+        # For disabled outputs, fall back to the preferred mode (or first available)
+        # so the block renders at a sensible size on the canvas.
+        fallback_mode = (
+            next((m for m in output.modes if m.is_preferred), None)
+            or (output.modes[0] if output.modes else None)
+        )
+        fallback_w = fallback_mode.width  if fallback_mode else 1920
+        fallback_h = fallback_mode.height if fallback_mode else 1080
+
         return {
             "name": output.name,
             "displayName": output.display_name(),
@@ -422,16 +464,17 @@ class DisplayBridge(QObject):
                 }
                 for m in output.modes
             ],
-            "current_mode": output.current_mode,
+            "current_mode": output.current_mode if output.current_mode is not None else (
+                next((i for i, m in enumerate(output.modes) if m.is_preferred), 0)
+            ),
             "vrr_supported": output.vrr_supported,
             "vrr_enabled": output.vrr_enabled,
             "scale": logical.scale if logical else 1.0,
             "transform": logical.transform if logical else "Normal",
             "pos_x": logical.x if logical else 0,
             "pos_y": logical.y if logical else 0,
-            "logical_width": logical.width if logical else (mode.width if mode else 0),
-            "logical_height": logical.height if logical else (mode.height if mode else 0),
-            "display_type": "extend",  # Default; profiles can override
+            "logical_width":  logical.width  if logical else fallback_w,
+            "logical_height": logical.height if logical else fallback_h,
         }
 
     def _apply_to_ipc(self) -> None:
