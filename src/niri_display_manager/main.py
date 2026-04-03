@@ -48,16 +48,19 @@ def _run_gui() -> None:
     app.setOrganizationDomain("io.github.rickycbanks")
 
     from niri_display_manager.ui.bridge import DisplayBridge
+    from niri_display_manager.ui.theme_bridge import ThemeBridge
 
     bridge = DisplayBridge()
+    theme = ThemeBridge()
     engine = QQmlApplicationEngine()
 
     # Register QML module paths
     qml_dir = Path(__file__).parent.parent.parent / "qml"
     engine.addImportPath(str(qml_dir))
 
-    # Expose bridge to QML as a context property
+    # Expose bridge and theme to QML as context properties
     engine.rootContext().setContextProperty("DisplayBridge", bridge)
+    engine.rootContext().setContextProperty("ThemeDyn", theme)
 
     qml_path = qml_dir / "main.qml"
     engine.load(qml_path)
