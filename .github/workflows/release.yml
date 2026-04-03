@@ -83,26 +83,15 @@ jobs:
         shell: bash
         env:
           AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          GIT_SSH_COMMAND: "ssh -i ~/.ssh/aur -o StrictHostKeyChecking=accept-new"
         run: |
-          # Set up SSH
           mkdir -p ~/.ssh
           echo "$AUR_SSH_PRIVATE_KEY" > ~/.ssh/aur
           chmod 600 ~/.ssh/aur
 
-          # Trust AUR host key
-          ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts
-
-          cat > ~/.ssh/config <<'EOF'
-          Host aur.archlinux.org
-            IdentityFile ~/.ssh/aur
-            User aur
-          EOF
-          chmod 600 ~/.ssh/config
-
-          # Clone AUR repo, copy files, commit and push
           git clone ssh://aur@aur.archlinux.org/niri-display-manager.git /tmp/aur-repo
           cp packaging/aur/PKGBUILD /tmp/aur-repo/PKGBUILD
-          cp packaging/aur/.SRCINFO /tmp/aur-repo/.SRCINFO
+          cp packaging/aur/.SRCINFO  /tmp/aur-repo/.SRCINFO
           cd /tmp/aur-repo
           git config user.name  "rickycbanks"
           git config user.email "${{ secrets.AUR_EMAIL }}"
