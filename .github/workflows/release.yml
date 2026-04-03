@@ -50,7 +50,15 @@ jobs:
     name: Publish to AUR
     runs-on: ubuntu-latest
     needs: release
+    container:
+      image: archlinux:latest
     steps:
+      - name: Install dependencies
+        run: |
+          pacman-key --init
+          pacman-key --populate archlinux
+          pacman -Syu --noconfirm --needed git openssh pacman
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -59,16 +67,35 @@ jobs:
           VERSION=${{ needs.release.outputs.version }}
           SHA256=${{ needs.release.outputs.sha256 }}
           sed -i "s/^pkgver=.*/pkgver=$VERSION/" packaging/aur/PKGBUILD
-          sed -i "s/^pkgrel=.*/pkgrel=1/" packaging/aur/PKGBUILD
+          sed -i "s/^pkgrel=.*/pkgrel=1/"       packaging/aur/PKGBUILD
           sed -i "s/sha256sums=('[^']*')/sha256sums=('$SHA256')/" packaging/aur/PKGBUILD
 
-      - name: Publish to AUR
-        uses: KSXGitHub/github-actions-deploy-aur@v3
-        with:
-          pkgname: niri-display-manager
-          pkgbuild: packaging/aur/PKGBUILD
-          commit_username: rickycbanks
-          commit_email: ${{ secrets.AUR_EMAIL }}
-          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
-          commit_message: "Update to v${{ needs.release.outputs.version }}"
-          force_push: true
+      - name: Generate .SRCINFO
+        run: |
+          # makepkg --printsrcinfo requires a non-root user
+          useradd -m builder
+          cp -r packaging/aur /tmp/aur
+          chown -R builder /tmp/aur
+          su builder -c "cd /tmp/aur && makepkg --printsrcinfo > .SRCINFO"
+          cp /tmp/aur/.SRCINFO packaging/aur/.SRCINFO
+
+      - name: Push to AUR
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        run: |
+          # Set up SSH
+          mkdir -p ~/.ssh
+          echo "$AUR_SSH_PRIVATE_KEY" > ~/.ssh/aur
+          chmod 600 ~/.ssh/aur
+          echo -e "Host aur.archlinux.org\n  IdentityFile ~/.ssh/aur\n  User aur\n  StrictHostKeyChecking no" > ~/.ssh/config
+
+          # Clone AUR repo, copy files, commit and push
+          git clone ssh://aur@aur.archlinux.org/niri-display-manager.git /tmp/aur-repo
+          cp packaging/aur/PKGBUILD /tmp/aur-repo/PKGBUILD
+          cp packaging/aur/.SRCINFO /tmp/aur-repo/.SRCINFO
+          cd /tmp/aur-repo
+          git config user.name  "rickycbanks"
+          git config user.email "${{ secrets.AUR_EMAIL }}"
+          git add PKGBUILD .SRCINFO
+          git diff --cached --quiet || git commit -m "Update to v${{ needs.release.outputs.version }}"
+          git push
