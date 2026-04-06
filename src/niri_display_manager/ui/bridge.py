@@ -375,8 +375,7 @@ class DisplayBridge(QObject):
     @Slot(result=str)
     def findAutoProfile(self) -> str:
         """Return the name of a matching auto-profile, or empty string."""
-        names = list(self._live_outputs.keys())
-        result = pm.find_auto_profile(names)
+        result = pm.find_auto_profile(self._staged)
         return result or ""
 
     # ------------------------------------------------------------------

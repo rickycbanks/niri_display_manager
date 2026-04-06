@@ -43,7 +43,15 @@ def save_profile(name: str, staged: dict[str, dict]) -> None:
     staged: mapping of output_name → staged output dict (from DisplayBridge._staged)
     """
     _ensure_dir()
-    connector_key = sorted(staged.keys())
+    connector_key = sorted(
+        _output_fingerprint(
+            output_name,
+            data.get("make", "Unknown"),
+            data.get("model", "Unknown"),
+            data.get("serial"),
+        )
+        for output_name, data in staged.items()
+    )
 
     outputs = {}
     for output_name, data in staged.items():
@@ -69,6 +77,7 @@ def save_profile(name: str, staged: dict[str, dict]) -> None:
 
     profile = {
         "name": name,
+        "version": 2,
         "connector_key": connector_key,
         "outputs": outputs,
     }
@@ -104,17 +113,66 @@ def rename_profile(old_name: str, new_name: str) -> None:
     _profile_path(old_name).unlink()
 
 
-def find_auto_profile(connected_names: list[str]) -> Optional[str]:
+def _output_fingerprint(name: str, make: str, model: str, serial: str | None) -> str:
     """
-    Find the first saved profile whose connector_key matches the given set of output names.
-    Returns the profile name, or None if no match.
+    Generate a stable device fingerprint for profile matching.
+
+    Prefers make:model:serial when the device provides identification data.
+    Falls back to the connector name when make/model are unknown (e.g. some older
+    displays that don't expose EDID properly), so those outputs still participate
+    in profile matching using their port name.
     """
-    key = sorted(connected_names)
+    parts = [p for p in (make, model) if p and p not in ("Unknown", "")]
+    if parts:
+        identity = ":".join(parts)
+        if serial:
+            identity = f"{identity}:{serial}"
+    else:
+        identity = name
+    return identity
+
+
+def find_auto_profile(connected: dict[str, dict] | list[str]) -> Optional[str]:
+    """
+    Find the first saved profile whose connector_key matches the connected outputs.
+
+    connected: either a mapping of output_name → output_data dict (containing
+               'make', 'model', 'serial' keys) for fingerprint-based matching,
+               or a legacy list of connector name strings for v1 profiles.
+
+    v2 profiles (saved by the current code) match on device fingerprints so the
+    same display is recognised regardless of which port it is connected to, and
+    different displays on the same port are correctly distinguished.
+
+    v1 profiles (saved by older versions) fall back to plain connector-name
+    matching so existing profiles continue to work without migration.
+    """
+    if isinstance(connected, dict):
+        fingerprint_key = sorted(
+            _output_fingerprint(
+                name,
+                data.get("make", "Unknown"),
+                data.get("model", "Unknown"),
+                data.get("serial"),
+            )
+            for name, data in connected.items()
+        )
+        name_key = sorted(connected.keys())
+    else:
+        fingerprint_key = None
+        name_key = sorted(connected)
+
     for pname in list_profiles():
         try:
             profile = load_profile(pname)
-            if sorted(profile.get("connector_key", [])) == key:
-                return pname
+            version = profile.get("version", 1)
+            ck = sorted(profile.get("connector_key", []))
+            if version >= 2 and fingerprint_key is not None:
+                if ck == fingerprint_key:
+                    return pname
+            else:
+                if ck == name_key:
+                    return pname
         except Exception:
             continue
     return None

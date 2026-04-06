@@ -135,14 +135,26 @@ def _check_and_apply(last_names: frozenset) -> frozenset:
         log.warning("Could not query Niri outputs: %s", e)
         return last_names
 
-    current_names = frozenset(name for name, out in outputs.items() if out.enabled is not False)
+    # Use all connected outputs (enabled or disabled) for both change detection
+    # and profile matching — a newly connected but initially-disabled display
+    # should still trigger an auto-profile lookup.
+    current_names = frozenset(outputs.keys())
 
     if current_names == last_names:
         return current_names
 
     log.info("Output set changed: %s", sorted(current_names))
 
-    profile_name = pm.find_auto_profile(list(current_names))
+    # Build output dicts with device identity for fingerprint-based matching
+    output_data = {
+        name: {
+            "make": out.make,
+            "model": out.model,
+            "serial": out.serial,
+        }
+        for name, out in outputs.items()
+    }
+    profile_name = pm.find_auto_profile(output_data)
     if profile_name:
         log.info("Auto-applying profile '%s'", profile_name)
         _apply_profile(profile_name, outputs)
