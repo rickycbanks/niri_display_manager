@@ -259,6 +259,7 @@ class DisplayBridge(QObject):
                 name: self._output_to_dict(out)
                 for name, out in self._live_outputs.items()
             }
+            self._park_disabled_outputs()
             self._set_has_changes(False)
             self.outputsChanged.emit()
         except Exception as e:
@@ -271,6 +272,7 @@ class DisplayBridge(QObject):
             name: self._output_to_dict(out)
             for name, out in self._live_outputs.items()
         }
+        self._park_disabled_outputs()
         self._set_has_changes(False)
         self.outputsChanged.emit()
 
@@ -306,6 +308,7 @@ class DisplayBridge(QObject):
                 name: self._output_to_dict(out)
                 for name, out in self._live_outputs.items()
             }
+            self._park_disabled_outputs()
             self._set_has_changes(False)
             self.outputsChanged.emit()
         except Exception as e:

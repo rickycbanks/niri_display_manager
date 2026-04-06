@@ -91,24 +91,25 @@ def _run_udev_loop() -> None:
 
     log.info("Watching udev DRM events")
 
-    # Track last known output set for change detection
-    last_names: frozenset[str] = frozenset()
+    # Use a mutable list so the callback can update last_names across calls.
+    # A plain frozenset variable can't be shared by reference with the callback.
+    last_names_ref: list[frozenset] = [frozenset()]
 
-    with pyudev.MonitorObserver(monitor, _make_udev_callback(last_names)) as observer:
+    with pyudev.MonitorObserver(monitor, _make_udev_callback(last_names_ref)) as observer:
         # Also do an initial check at startup
-        _check_and_apply(last_names)
+        last_names_ref[0] = _check_and_apply(last_names_ref[0])
         while True:
             time.sleep(60)  # Observer runs on its own thread; main thread just idles
 
 
-def _make_udev_callback(last_names_ref: frozenset):
+def _make_udev_callback(last_names_ref: list):
     def _on_event(device: "pyudev.Device") -> None:
         if device.action not in ("change", "add", "remove"):
             return
         log.debug("udev event: %s %s", device.action, device.sys_path)
-        # Settle then check
+        # Settle then check; update shared state so repeated events are deduplicated
         time.sleep(_SETTLE_SECONDS)
-        _check_and_apply(last_names_ref)
+        last_names_ref[0] = _check_and_apply(last_names_ref[0])
 
     return _on_event
 
