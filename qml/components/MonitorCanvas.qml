@@ -63,7 +63,7 @@ Item {
 
                 if (root.snapToGrid) {
                     // Near-white lines for clear visibility against the dark canvas
-                    ctx.strokeStyle = Qt.rgba(Theme.textPrimary.r, Theme.textPrimary.g, Theme.textPrimary.b, 0.35)
+                    ctx.strokeStyle = Qt.rgba(Theme.accentGlow.r, Theme.accentGlow.g, Theme.accentGlow.b, 0.8)
                     ctx.lineWidth = 1
                     ctx.beginPath()
                     for (var x = step; x < width; x += step) {
@@ -76,7 +76,7 @@ Item {
                     }
                     ctx.stroke()
                     // Solid near-white dots at intersections to mark snap points
-                    ctx.fillStyle = Qt.rgba(Theme.textPrimary.r, Theme.textPrimary.g, Theme.textPrimary.b, 0.75)
+                    ctx.fillStyle = Qt.rgba(Theme.accentGlow.r, Theme.accentGlow.g, Theme.accentGlow.b, 1.0)
                     for (var ix = step; ix < width; ix += step) {
                         for (var iy = step; iy < height; iy += step) {
                             ctx.beginPath()
