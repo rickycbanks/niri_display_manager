@@ -19,12 +19,14 @@ from PySide6.QtCore import (
     Slot,
     Property,
     QTimer,
+    QThread,
 )
 from PySide6.QtQml import QmlElement
 
 from niri_display_manager.ipc.niri_socket import (
     Output,
     get_outputs,
+    event_stream,
     set_output_off,
     set_output_on,
     set_output_mode,
@@ -46,6 +48,39 @@ from niri_display_manager.config import profile_manager as pm
 
 QML_IMPORT_NAME = "NiriDisplayManager"
 QML_IMPORT_MAJOR_VERSION = 1
+
+
+class _StopWatcher(Exception):
+    """Raised inside the event-stream callback to cleanly interrupt the loop."""
+
+
+class _OutputWatcher(QThread):
+    """
+    Background thread that subscribes to the Niri event stream.
+
+    Emits outputsChanged whenever Niri reports that the output set has been
+    modified (OutputsChanged event).  Automatically reconnects with a 3-second
+    back-off if the socket is closed (e.g. Niri restart or compositor crash).
+    """
+
+    outputsChanged = Signal()
+
+    def run(self) -> None:
+        while not self.isInterruptionRequested():
+            try:
+                event_stream(self._handle_event)
+            except _StopWatcher:
+                break
+            except Exception:
+                # Socket unavailable or closed — wait briefly then retry
+                if not self.isInterruptionRequested():
+                    self.msleep(3000)
+
+    def _handle_event(self, event: dict) -> None:
+        if self.isInterruptionRequested():
+            raise _StopWatcher
+        if "OutputsChanged" in event:
+            self.outputsChanged.emit()
 
 
 @QmlElement
@@ -93,6 +128,22 @@ class DisplayBridge(QObject):
         self._preview_timer.timeout.connect(self._on_preview_tick)
 
         self._kdl_file: KdlOutputFile | None = None
+
+        # Hotplug watcher — auto-refresh when the compositor reports output changes
+        self._refresh_debounce = QTimer(self)
+        self._refresh_debounce.setSingleShot(True)
+        self._refresh_debounce.setInterval(500)
+        self._refresh_debounce.timeout.connect(self._on_hotplug_refresh)
+
+        self._watcher = _OutputWatcher(self)
+        self._watcher.outputsChanged.connect(self._refresh_debounce.start)
+        self._watcher.start()
+
+        from PySide6.QtGui import QGuiApplication
+        app = QGuiApplication.instance()
+        if app:
+            app.aboutToQuit.connect(self._stop_watcher)
+
         self.refresh()
 
     # ------------------------------------------------------------------
@@ -408,6 +459,16 @@ class DisplayBridge(QObject):
         self.previewSecondsLeftChanged.emit()
         if self._preview_seconds_left <= 0:
             self.revertPreview()
+
+    def _on_hotplug_refresh(self) -> None:
+        """Called by the debounce timer after a hotplug event. Skipped during preview."""
+        if not self._preview_active:
+            self.refresh()
+
+    def _stop_watcher(self) -> None:
+        """Gracefully stop the event-stream watcher thread on app exit."""
+        self._watcher.requestInterruption()
+        self._watcher.wait(2000)
 
     def _stop_preview(self) -> None:
         self._preview_timer.stop()
