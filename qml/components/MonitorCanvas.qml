@@ -61,16 +61,9 @@ Item {
                 var step = 24
 
                 if (root.snapToGrid) {
-                    // Grid lines — clearly shows snap mode is active
-                    ctx.strokeStyle = Qt.rgba(
-                        parseFloat(Theme.border.toString().slice(1,3), 16) / 255,
-                        parseFloat(Theme.border.toString().slice(3,5), 16) / 255,
-                        parseFloat(Theme.border.toString().slice(5,7), 16) / 255,
-                        0.55)
-                    // Simpler: use a semi-transparent border colour
-                    ctx.strokeStyle = Theme.border
-                    ctx.globalAlpha = 0.35
-                    ctx.lineWidth = 0.5
+                    // Grid lines using accent colour so they stand out in snap mode
+                    ctx.strokeStyle = Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.25)
+                    ctx.lineWidth = 1
                     ctx.beginPath()
                     for (var x = step; x < width; x += step) {
                         ctx.moveTo(x, 0)
@@ -81,7 +74,15 @@ Item {
                         ctx.lineTo(width, y)
                     }
                     ctx.stroke()
-                    ctx.globalAlpha = 1.0
+                    // Accent dots at every intersection for a clear snap-grid feel
+                    ctx.fillStyle = Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.55)
+                    for (var ix = step; ix < width; ix += step) {
+                        for (var iy = step; iy < height; iy += step) {
+                            ctx.beginPath()
+                            ctx.arc(ix, iy, 1.5, 0, Math.PI * 2)
+                            ctx.fill()
+                        }
+                    }
                 } else {
                     // Dot pattern — freeform mode
                     ctx.fillStyle = Theme.border
