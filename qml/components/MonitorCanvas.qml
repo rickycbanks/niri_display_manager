@@ -63,7 +63,7 @@ Item {
 
                 if (root.snapToGrid) {
                     // Near-white lines for clear visibility against the dark canvas
-                    ctx.strokeStyle = Qt.rgba(Theme.accentGlow.r, Theme.accentGlow.g, Theme.accentGlow.b, 0.8)
+                    ctx.strokeStyle = Qt.rgba(Theme.accentGlow.r, Theme.accentGlow.g, Theme.accentGlow.b, 0.4)
                     ctx.lineWidth = 1
                     ctx.beginPath()
                     for (var x = step; x < width; x += step) {
