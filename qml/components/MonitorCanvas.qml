@@ -62,8 +62,8 @@ Item {
                 var step = 24
 
                 if (root.snapToGrid) {
-                    // Use accentGlow (lightest accent variant) for contrast against dark bgCard
-                    ctx.strokeStyle = Qt.rgba(Theme.accentGlow.r, Theme.accentGlow.g, Theme.accentGlow.b, 0.8)
+                    // Near-white lines for clear visibility against the dark canvas
+                    ctx.strokeStyle = Qt.rgba(Theme.textPrimary.r, Theme.textPrimary.g, Theme.textPrimary.b, 0.35)
                     ctx.lineWidth = 1
                     ctx.beginPath()
                     for (var x = step; x < width; x += step) {
@@ -75,8 +75,8 @@ Item {
                         ctx.lineTo(width, y)
                     }
                     ctx.stroke()
-                    // Bright intersection dots to clearly mark snap points
-                    ctx.fillStyle = Qt.rgba(Theme.accentGlow.r, Theme.accentGlow.g, Theme.accentGlow.b, 1.0)
+                    // Solid near-white dots at intersections to mark snap points
+                    ctx.fillStyle = Qt.rgba(Theme.textPrimary.r, Theme.textPrimary.g, Theme.textPrimary.b, 0.75)
                     for (var ix = step; ix < width; ix += step) {
                         for (var iy = step; iy < height; iy += step) {
                             ctx.beginPath()
@@ -86,7 +86,7 @@ Item {
                     }
                 } else {
                     // Dot pattern — freeform mode
-                    ctx.fillStyle = Theme.border
+                    ctx.fillStyle = Qt.rgba(Theme.textPrimary.r, Theme.textPrimary.g, Theme.textPrimary.b, 0.2)
                     for (var dx = step; dx < width; dx += step) {
                         for (var dy = step; dy < height; dy += step) {
                             ctx.beginPath()
