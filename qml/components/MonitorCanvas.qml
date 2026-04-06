@@ -76,7 +76,7 @@ Item {
                     }
                     ctx.stroke()
                     // Solid near-white dots at intersections to mark snap points
-                    ctx.fillStyle = Qt.rgba(Theme.accentGlow.r, Theme.accentGlow.g, Theme.accentGlow.b, 1.0)
+                    ctx.fillStyle = Qt.rgba(Theme.accentGlow.r, Theme.accentGlow.g, Theme.accentGlow.b, 0.8)
                     for (var ix = step; ix < width; ix += step) {
                         for (var iy = step; iy < height; iy += step) {
                             ctx.beginPath()
