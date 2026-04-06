@@ -51,9 +51,10 @@ Item {
             id: bgCanvas
             anchors.fill: parent
 
-            // Repaint when snap mode toggles
-            property bool _snap: root.snapToGrid
-            on_SnapChanged: requestPaint()
+            Connections {
+                target: root
+                function onSnapToGridChanged() { bgCanvas.requestPaint() }
+            }
 
             onPaint: {
                 var ctx = getContext("2d")
