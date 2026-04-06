@@ -62,8 +62,8 @@ Item {
                 var step = 24
 
                 if (root.snapToGrid) {
-                    // Grid lines using accent colour so they stand out in snap mode
-                    ctx.strokeStyle = Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.25)
+                    // Use accentGlow (lightest accent variant) for contrast against dark bgCard
+                    ctx.strokeStyle = Qt.rgba(Theme.accentGlow.r, Theme.accentGlow.g, Theme.accentGlow.b, 0.45)
                     ctx.lineWidth = 1
                     ctx.beginPath()
                     for (var x = step; x < width; x += step) {
@@ -75,8 +75,8 @@ Item {
                         ctx.lineTo(width, y)
                     }
                     ctx.stroke()
-                    // Accent dots at every intersection for a clear snap-grid feel
-                    ctx.fillStyle = Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.55)
+                    // Bright intersection dots to clearly mark snap points
+                    ctx.fillStyle = Qt.rgba(Theme.accentGlow.r, Theme.accentGlow.g, Theme.accentGlow.b, 0.85)
                     for (var ix = step; ix < width; ix += step) {
                         for (var iy = step; iy < height; iy += step) {
                             ctx.beginPath()
