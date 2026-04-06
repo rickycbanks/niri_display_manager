@@ -63,7 +63,7 @@ Item {
 
                 if (root.snapToGrid) {
                     // Use accentGlow (lightest accent variant) for contrast against dark bgCard
-                    ctx.strokeStyle = Qt.rgba(Theme.accentGlow.r, Theme.accentGlow.g, Theme.accentGlow.b, 0.45)
+                    ctx.strokeStyle = Qt.rgba(Theme.accentGlow.r, Theme.accentGlow.g, Theme.accentGlow.b, 0.8)
                     ctx.lineWidth = 1
                     ctx.beginPath()
                     for (var x = step; x < width; x += step) {
@@ -76,7 +76,7 @@ Item {
                     }
                     ctx.stroke()
                     // Bright intersection dots to clearly mark snap points
-                    ctx.fillStyle = Qt.rgba(Theme.accentGlow.r, Theme.accentGlow.g, Theme.accentGlow.b, 0.85)
+                    ctx.fillStyle = Qt.rgba(Theme.accentGlow.r, Theme.accentGlow.g, Theme.accentGlow.b, 1.0)
                     for (var ix = step; ix < width; ix += step) {
                         for (var iy = step; iy < height; iy += step) {
                             ctx.beginPath()
