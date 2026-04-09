@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  # ── Build source tarball and attach to GitHub Release ──────────
+  # ── Create GitHub Release (no artifacts yet) ───────────────────
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
@@ -24,7 +24,7 @@ jobs:
         id: get_version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Build source tarball
+      - name: Build source tarball (for sha256)
         run: |
           git archive \
             --format=tar.gz \
@@ -38,12 +38,157 @@ jobs:
           HASH=$(sha256sum niri-display-manager-${{ steps.get_version.outputs.version }}.tar.gz | awk '{print $1}')
           echo "sha256=$HASH" >> "$GITHUB_OUTPUT"
 
-      - name: Create GitHub Release and upload tarball
+      - name: Create GitHub Release (empty — packages uploaded by downstream jobs)
         uses: softprops/action-gh-release@v2
         with:
           name: "v${{ steps.get_version.outputs.version }}"
           generate_release_notes: true
-          files: niri-display-manager-${{ steps.get_version.outputs.version }}.tar.gz
+
+  # ── Source tarball ─────────────────────────────────────────────
+  build-tarball:
+    name: Build source tarball
+    runs-on: ubuntu-latest
+    needs: release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build tarball
+        run: |
+          git archive \
+            --format=tar.gz \
+            --prefix=niri_display_manager-${{ needs.release.outputs.version }}/ \
+            HEAD \
+            -o niri-display-manager-${{ needs.release.outputs.version }}.tar.gz
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: niri-display-manager-${{ needs.release.outputs.version }}.tar.gz
+
+  # ── Debian package ─────────────────────────────────────────────
+  build-deb:
+    name: Build .deb package
+    runs-on: ubuntu-latest
+    needs: release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends \
+            python3-build python3-pip python3-hatchling ruby ruby-dev rubygems build-essential
+          sudo gem install --no-document fpm
+
+      - name: Build wheel
+        run: python3 -m build --wheel --no-isolation
+
+      - name: Populate staging dir
+        run: |
+          VERSION=${{ needs.release.outputs.version }}
+          STAGING=dist/staging
+          pip3 install --quiet --prefix=$STAGING/usr dist/*.whl
+          install -dm755 $STAGING/usr/share/niri-display-manager
+          cp -r qml $STAGING/usr/share/niri-display-manager/
+          install -Dm644 packaging/io.github.rickycbanks.NiriDisplayManager.desktop \
+              $STAGING/usr/share/applications/io.github.rickycbanks.NiriDisplayManager.desktop
+          install -Dm644 assets/icons/niri-display-manager.svg \
+              $STAGING/usr/share/icons/hicolor/scalable/apps/io.github.rickycbanks.NiriDisplayManager.svg
+          install -Dm644 packaging/systemd/niri-display-manager-daemon.service \
+              $STAGING/usr/lib/systemd/user/niri-display-manager-daemon.service
+          install -Dm644 LICENSE \
+              $STAGING/usr/share/licenses/niri-display-manager/LICENSE
+
+      - name: Build .deb with fpm
+        run: |
+          VERSION=${{ needs.release.outputs.version }}
+          fpm \
+            -s dir \
+            -t deb \
+            -C dist/staging \
+            --name niri-display-manager \
+            --version $VERSION \
+            --iteration 1 \
+            --architecture amd64 \
+            --description "GUI display manager for the Niri Wayland window manager" \
+            --url "https://github.com/rickycbanks/niri_display_manager" \
+            --license MIT \
+            --depends "python3 (>= 3.12)" \
+            --depends "python3-pyside6" \
+            --depends "python3-pyudev" \
+            --package dist/niri-display-manager_${VERSION}_amd64.deb \
+            usr
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/niri-display-manager_${{ needs.release.outputs.version }}_amd64.deb
+
+  # ── RPM package ────────────────────────────────────────────────
+  build-rpm:
+    name: Build .rpm package
+    runs-on: ubuntu-latest
+    needs: release
+    container:
+      image: fedora:latest
+    steps:
+      - name: Install build dependencies
+        run: |
+          dnf install -y --setopt=install_weak_deps=False \
+            python3-build python3-pip python3-hatchling \
+            ruby ruby-devel rubygems gcc make rpm-build
+
+      - name: Install fpm
+        run: gem install --no-document fpm
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build wheel
+        run: python3 -m build --wheel --no-isolation
+
+      - name: Populate staging dir
+        run: |
+          VERSION=${{ needs.release.outputs.version }}
+          STAGING=dist/staging
+          pip3 install --quiet --prefix=$STAGING/usr dist/*.whl
+          install -dm755 $STAGING/usr/share/niri-display-manager
+          cp -r qml $STAGING/usr/share/niri-display-manager/
+          install -Dm644 packaging/io.github.rickycbanks.NiriDisplayManager.desktop \
+              $STAGING/usr/share/applications/io.github.rickycbanks.NiriDisplayManager.desktop
+          install -Dm644 assets/icons/niri-display-manager.svg \
+              $STAGING/usr/share/icons/hicolor/scalable/apps/io.github.rickycbanks.NiriDisplayManager.svg
+          install -Dm644 packaging/systemd/niri-display-manager-daemon.service \
+              $STAGING/usr/lib/systemd/user/niri-display-manager-daemon.service
+          install -Dm644 LICENSE \
+              $STAGING/usr/share/licenses/niri-display-manager/LICENSE
+
+      - name: Build .rpm with fpm
+        run: |
+          VERSION=${{ needs.release.outputs.version }}
+          fpm \
+            -s dir \
+            -t rpm \
+            -C dist/staging \
+            --name niri-display-manager \
+            --version $VERSION \
+            --iteration 1 \
+            --architecture x86_64 \
+            --description "GUI display manager for the Niri Wayland window manager" \
+            --url "https://github.com/rickycbanks/niri_display_manager" \
+            --license MIT \
+            --depends "python3 >= 3.12" \
+            --depends "python3-pyside6" \
+            --depends "python3-pyudev" \
+            --package dist/niri-display-manager-${VERSION}-1.x86_64.rpm \
+            usr
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/niri-display-manager-${{ needs.release.outputs.version }}-1.x86_64.rpm
 
   # ── Publish PKGBUILD to AUR ────────────────────────────────────
   aur:

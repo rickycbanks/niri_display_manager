@@ -1,7 +1,7 @@
 # Niri Display Manager
 
 A GUI display manager for the [Niri](https://github.com/YaLTeR/niri) window manager.
-Built with Python + PySide6 + QML, designed to eventually become a [Noctalia](https://github.com/noctalia-dev/noctalia-shell) plugin.
+Built with Python + PySide6 + QML.
 
 [![AUR version](https://img.shields.io/aur/version/niri-display-manager)](https://aur.archlinux.org/packages/niri-display-manager)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -34,9 +34,22 @@ cd niri-display-manager
 makepkg -si
 ```
 
-### Flatpak *(coming soon)*
+### Debian / Ubuntu
 
-Flatpak support is in progress. For now, use the AUR package or run from source.
+Download the `.deb` from the [latest release](https://github.com/rickycbanks/niri_display_manager/releases/latest):
+
+```bash
+sudo dpkg -i niri-display-manager_<version>_amd64.deb
+sudo apt-get install -f   # install any missing dependencies
+```
+
+### Fedora / RPM-based
+
+Download the `.rpm` from the [latest release](https://github.com/rickycbanks/niri_display_manager/releases/latest):
+
+```bash
+sudo dnf install niri-display-manager-<version>-1.x86_64.rpm
+```
 
 ## Running from Source
 
@@ -88,36 +101,45 @@ qml/                        # QML UI
 
 packaging/
   aur/PKGBUILD              # Arch Linux — live on AUR
-  flatpak/                  # Flatpak manifest (in progress)
   systemd/                  # Hotplug daemon service unit
+  io.github.rickycbanks.NiriDisplayManager.desktop  # Shared desktop entry
 
 .github/workflows/
-  release.yml               # Tag push → GitHub Release tarball + AUR publish
+  release.yml               # Tag push → GitHub Release (tarball + .deb + .rpm + AUR)
 ```
 
 ## Releasing
 
-Releases are fully automated via GitHub Actions. Pushing a version tag:
-1. Builds a source tarball and creates a GitHub Release
-2. Updates `pkgver`/`sha256sums` in the PKGBUILD and pushes to AUR
+Releases are fully automated via GitHub Actions. Pushing a version tag triggers four independent jobs — a failure in one does not block the others:
+
+1. **tarball** — source archive attached to the GitHub Release
+2. **deb** — `.deb` package for Debian/Ubuntu
+3. **rpm** — `.rpm` package for Fedora/RPM-based distros
+4. **aur** — updates `pkgver`/`sha256sums` in the PKGBUILD and pushes to AUR
 
 ```bash
 git tag v0.x.y
 git push origin v0.x.y
 ```
 
-## Noctalia Plugin (Future)
+## Local Builds
 
-The QML files under `qml/` are structured to slot directly into a Noctalia plugin.
-When ready, they become `Panel.qml`, `Settings.qml`, etc. per the
-[plugin spec](https://github.com/noctalia-dev/noctalia-plugins).
+A `Makefile` at the repo root builds packages locally (requires `fpm`: `gem install fpm`):
+
+```bash
+make build-tarball   # dist/niri-display-manager-<version>.tar.gz
+make build-deb       # dist/niri-display-manager_<version>_amd64.deb
+make build-rpm       # dist/niri-display-manager-<version>-1.x86_64.rpm
+make build-all       # all three
+make clean           # remove dist/
+```
 
 ## Roadmap
 
 - [x] AUR package
 - [x] Automated releases via GitHub Actions
-- [ ] Flatpak / Flathub
-- [ ] Noctalia plugin integration
+- [x] `.deb` and `.rpm` packages
+- [ ] Flathub / additional distro repositories
 
 ## License
 
