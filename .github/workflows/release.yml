@@ -52,6 +52,7 @@ jobs:
       - name: Create GitHub Release (empty — packages uploaded by downstream jobs)
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ steps.get_version.outputs.version }}
           name: "v${{ steps.get_version.outputs.version }}"
           generate_release_notes: true
 
@@ -75,6 +76,7 @@ jobs:
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ needs.release.outputs.version }}
           files: niri-display-manager-${{ needs.release.outputs.version }}.tar.gz
 
   # ── Debian package ─────────────────────────────────────────────
@@ -135,6 +137,7 @@ jobs:
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ needs.release.outputs.version }}
           files: dist/niri-display-manager_${{ needs.release.outputs.version }}_amd64.deb
 
   # ── RPM package ────────────────────────────────────────────────
@@ -199,6 +202,7 @@ jobs:
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ needs.release.outputs.version }}
           files: dist/niri-display-manager-${{ needs.release.outputs.version }}-1.x86_64.rpm
 
   # ── Publish PKGBUILD to AUR ────────────────────────────────────
