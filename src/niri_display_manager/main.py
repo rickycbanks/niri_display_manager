@@ -26,7 +26,7 @@ def main() -> None:
     parser.add_argument(
         "--version",
         action="version",
-        version="niri-display-manager 0.5.0",
+        version="niri-display-manager 0.8.0",
     )
     args = parser.parse_args()
 

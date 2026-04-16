@@ -7,7 +7,7 @@ Handles the format:
         scale S
         position x=X y=Y
         transform "T"
-        vrr
+        variable-refresh-rate
     }
 
 Disabled outputs use a `/-` prefix:
@@ -59,7 +59,7 @@ class KdlOutputBlock:
         if self.transform is not None and self.transform != "Normal":
             lines.append(f'    transform "{self.transform}"')
         if self.vrr is True:
-            lines.append('    vrr')
+            lines.append('    variable-refresh-rate')
         for extra in self.extra_lines:
             lines.append(f'    {extra}')
         lines.append("}")
@@ -80,7 +80,7 @@ _MODE_RE = re.compile(r'^\s*mode\s+"([^"]+)"')
 _SCALE_RE = re.compile(r'^\s*scale\s+([\d.]+)')
 _POSITION_RE = re.compile(r'^\s*position\s+x=([-\d]+)\s+y=([-\d]+)')
 _TRANSFORM_RE = re.compile(r'^\s*transform\s+"([^"]+)"')
-_VRR_RE = re.compile(r'^\s*vrr\b')
+_VRR_RE = re.compile(r'^\s*(?:variable-refresh-rate|vrr)\b')
 
 
 # ---------------------------------------------------------------------------

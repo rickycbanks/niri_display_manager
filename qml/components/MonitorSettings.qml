@@ -366,10 +366,11 @@ Rectangle {
         // ── VRR ──────────────────────────────────────────────────────
         RowLayout {
             Layout.fillWidth: true
-            visible: outputData && outputData.vrr_supported
+            visible: outputData !== null
+            readonly property bool vrrSupported: outputData ? outputData.vrr_supported : false
             Text {
                 text: "Variable Refresh Rate"
-                color: Theme.textPrimary
+                color: parent.vrrSupported ? Theme.textPrimary : Theme.textDisabled
                 font.pixelSize: Theme.fontSizeM
                 Layout.fillWidth: true
             }
@@ -377,6 +378,7 @@ Rectangle {
                 checked: outputData ? outputData.vrr_enabled : false
                 enabled: outputData && outputData.enabled && outputData.vrr_supported
                 onToggled: DisplayBridge.setVrr(outputName, checked)
+                opacity: parent.vrrSupported ? 1.0 : 0.4
             }
         }
 
