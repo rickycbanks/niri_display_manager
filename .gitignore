@@ -32,3 +32,6 @@ build-dir/
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Local project explanation (not for version control)
+explain.md
