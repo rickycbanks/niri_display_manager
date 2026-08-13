@@ -15,6 +15,9 @@ Disabled outputs use a `/-` prefix:
 
 Design principles:
   - Only modifies output blocks; all other content is preserved verbatim.
+  - Within an output block, anything this module does not model — nested blocks
+    such as `layout { ... }`, comments, unknown directives — is captured in
+    `extra_lines` and written back untouched.
   - Changes are staged in memory; call write() to commit to disk.
   - A backup copy (.bak) is written before any disk write.
 """
@@ -23,7 +26,7 @@ from __future__ import annotations
 
 import re
 import shutil
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Optional
 
@@ -43,7 +46,9 @@ class KdlOutputBlock:
     position_y: Optional[int]
     transform: Optional[str]   # "Normal", "90", etc.
     vrr: Optional[bool]
-    extra_lines: list[str] = field(default_factory=list)  # unrecognised lines preserved
+    # Unmodelled content preserved verbatim. Each entry is one directive, comment
+    # or nested block; nested blocks are multi-line strings dedented to depth 0.
+    extra_lines: list[str] = field(default_factory=list)
 
     def to_kdl(self) -> str:
         prefix = "/- " if not self.enabled else ""
@@ -61,7 +66,8 @@ class KdlOutputBlock:
         if self.vrr is True:
             lines.append('    variable-refresh-rate')
         for extra in self.extra_lines:
-            lines.append(f'    {extra}')
+            for extra_line in extra.splitlines():
+                lines.append(f'    {extra_line}' if extra_line.strip() else "")
         lines.append("}")
         return "\n".join(lines)
 
@@ -75,6 +81,8 @@ _BLOCK_START_RE = re.compile(
     r'^(?P<disabled>/-\s*)?output\s+"(?P<name>[^"]+)"\s*\{',
     re.MULTILINE,
 )
+
+_STRING_RE = re.compile(r'"(?:[^"\\]|\\.)*"')
 
 _MODE_RE = re.compile(r'^\s*mode\s+"([^"]+)"')
 _SCALE_RE = re.compile(r'^\s*scale\s+([\d.]+)')
@@ -113,7 +121,18 @@ class KdlOutputFile:
         return self._outputs.get(name)
 
     def upsert(self, block: KdlOutputBlock) -> None:
-        """Add or replace an output block (staged)."""
+        """
+        Add or replace an output block (staged).
+
+        Callers build blocks from live compositor state, which carries no record of
+        custom settings the user hand-wrote in the config (nested `layout { ... }`
+        blocks, unknown directives, comments). Those are inherited from the existing
+        block so applying a profile never discards them. A caller that wants to
+        replace them supplies its own non-empty extra_lines.
+        """
+        existing = self._outputs.get(block.name)
+        if existing is not None and not block.extra_lines:
+            block = replace(block, extra_lines=list(existing.extra_lines))
         self._outputs[block.name] = block
 
     def remove(self, name: str) -> None:
@@ -138,6 +157,26 @@ class KdlOutputFile:
 # Parsing
 # ---------------------------------------------------------------------------
 
+def _strip_noncode(line: str) -> str:
+    """Blank out quoted strings and trailing // comments so braces can be counted."""
+    text = _STRING_RE.sub('""', line)
+    idx = text.find("//")
+    return text if idx == -1 else text[:idx]
+
+
+def _brace_delta(line: str) -> int:
+    """Net change in brace depth for one line, ignoring strings and comments."""
+    text = _strip_noncode(line)
+    return text.count("{") - text.count("}")
+
+
+def _dedent(lines: list[str]) -> str:
+    """Join lines, removing the common leading indentation."""
+    indents = [len(l) - len(l.lstrip()) for l in lines if l.strip()]
+    cut = min(indents) if indents else 0
+    return "\n".join(l[cut:] if l.strip() else "" for l in lines)
+
+
 def _find_block_extents(text: str) -> list[tuple[int, int, str, bool]]:
     """
     Find all output block extents in text.
@@ -146,14 +185,33 @@ def _find_block_extents(text: str) -> list[tuple[int, int, str, bool]]:
     results = []
     for m in _BLOCK_START_RE.finditer(text):
         start = m.start()
-        # Walk forward counting braces to find the closing }
+        # Walk forward counting braces to find the matching }, skipping any that
+        # appear inside strings or comments.
         brace_pos = text.index("{", m.start())
         depth = 0
         i = brace_pos
+        in_string = False
         while i < len(text):
-            if text[i] == "{":
+            ch = text[i]
+            if in_string:
+                if ch == "\\":
+                    i += 2
+                    continue
+                if ch == '"':
+                    in_string = False
+            elif ch == '"':
+                in_string = True
+            elif ch == "/" and text[i + 1:i + 2] == "/":
+                newline = text.find("\n", i)
+                i = len(text) if newline == -1 else newline
+                continue
+            elif ch == "/" and text[i + 1:i + 2] == "*":
+                close = text.find("*/", i + 2)
+                i = len(text) if close == -1 else close + 2
+                continue
+            elif ch == "{":
                 depth += 1
-            elif text[i] == "}":
+            elif ch == "}":
                 depth -= 1
                 if depth == 0:
                     end = i + 1
@@ -174,10 +232,30 @@ def _parse_block(block_text: str, name: str, disabled: bool) -> KdlOutputBlock:
 
     # Extract lines inside the braces
     inner = block_text[block_text.index("{") + 1: block_text.rindex("}")]
-    for line in inner.splitlines():
+    lines = inner.splitlines()
+    i = 0
+    while i < len(lines):
+        line = lines[i]
         stripped = line.strip()
-        if not stripped or stripped.startswith("//"):
+        if not stripped:
+            i += 1
             continue
+
+        # A nested block (e.g. `layout { ... }`) is captured whole — however many
+        # lines it spans — so its contents and structure survive a rewrite. This
+        # also keeps directives inside it from being read as the output's own.
+        if _brace_delta(line) > 0:
+            depth = _brace_delta(line)
+            nested = [line]
+            i += 1
+            while i < len(lines) and depth > 0:
+                depth += _brace_delta(lines[i])
+                nested.append(lines[i])
+                i += 1
+            extra_lines.append(_dedent(nested))
+            continue
+
+        i += 1
         if m := _MODE_RE.match(line):
             mode = m.group(1)
         elif m := _SCALE_RE.match(line):
@@ -190,6 +268,7 @@ def _parse_block(block_text: str, name: str, disabled: bool) -> KdlOutputBlock:
         elif _VRR_RE.match(line):
             vrr = True
         else:
+            # Unknown directives and comments alike are kept verbatim.
             extra_lines.append(stripped)
 
     return KdlOutputBlock(
