@@ -90,6 +90,7 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 snapToGrid: displayTypeBar.snapToGrid
+                snapToMonitors: displayTypeBar.snapToMonitors
             }
 
             // Profile panel (collapsible)
