@@ -7,14 +7,22 @@ RowLayout {
     id: root
     spacing: Theme.spacingS
 
-    // Snap-to-grid state — toggled by the button; read by MonitorCanvas
+    // Snap state — toggled by the buttons; read by MonitorCanvas
     property bool snapToGrid: false
+    property bool snapToMonitors: true
 
     Item { Layout.fillWidth: true }
 
-    // Snap toggle
+    // Snap-to-monitor-edges toggle
     ModeButton {
-        label:  root.snapToGrid ? "⊞ Snap: On" : "⊟ Snap: Off"
+        label:  root.snapToMonitors ? "⇹ Snap Edges: On" : "⇹ Snap Edges: Off"
+        active: root.snapToMonitors
+        onClicked: root.snapToMonitors = !root.snapToMonitors
+    }
+
+    // Snap-to-grid toggle
+    ModeButton {
+        label:  root.snapToGrid ? "⊞ Grid: On" : "⊟ Grid: Off"
         active: root.snapToGrid
         onClicked: root.snapToGrid = !root.snapToGrid
     }

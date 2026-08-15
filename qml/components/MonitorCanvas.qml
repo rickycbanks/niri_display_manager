@@ -9,9 +9,90 @@ Item {
     property bool snapToGrid: false
     property int  gridSize:   100   // logical pixels per snap step
 
+    // Snap a dragged monitor to its neighbours' edges (any side) and to their
+    // edge/centre alignments. Threshold is in *screen* pixels so it feels the
+    // same however far the canvas is zoomed out.
+    property bool snapToMonitors: true
+    readonly property int snapThresholdPx: 14
+
     readonly property int padding: 40
 
     signal outputSelected(string name)
+
+    // ── Snap guides (logical coords; null when nothing is snapped) ──
+    property var _guideX: null
+    property var _guideY: null
+
+    function _clearGuides() {
+        root._guideX = null
+        root._guideY = null
+    }
+
+    // Resolve a dragged logical position into a snapped one. Returns {x, y}
+    // and publishes the guide lines that were hit as a side effect.
+    function _resolveSnap(name, logX, logY) {
+        if (!root.snapToMonitors) {
+            root._clearGuides()
+            return { x: logX, y: logY }
+        }
+
+        var outs = DisplayBridge.outputs
+        var self = null
+        for (var i = 0; i < outs.length; i++) {
+            if (outs[i].name === name) { self = outs[i]; break }
+        }
+        if (!self) {
+            root._clearGuides()
+            return { x: logX, y: logY }
+        }
+
+        var w = self.logical_width
+        var h = self.logical_height
+        var tol = root.snapThresholdPx / Math.max(root._fitScale, 0.0001)
+
+        // best = { delta, value, guide } — value is the snapped pos_x/pos_y,
+        // guide is the logical coordinate of the line to draw.
+        var bestX = null
+        var bestY = null
+
+        // candidate = the pos_x/pos_y the drag would snap to; guide = the
+        // logical coordinate of the shared line, for the on-screen hint.
+        function consider(best, candidate, current, guide) {
+            var delta = Math.abs(candidate - current)
+            if (delta > tol) return best
+            if (best !== null && delta >= best.delta) return best
+            return { delta: delta, value: candidate, guide: guide }
+        }
+
+        for (var j = 0; j < outs.length; j++) {
+            var o = outs[j]
+            if (o.name === name) continue
+            var ox = o.pos_x, oy = o.pos_y
+            var ow = o.logical_width, oh = o.logical_height
+
+            // ── Horizontal: butt against the left/right sides, then align ──
+            bestX = consider(bestX, ox + ow, logX, ox + ow)          // our left edge ↔ their right edge
+            bestX = consider(bestX, ox - w,  logX, ox)               // our right edge ↔ their left edge
+            bestX = consider(bestX, ox,      logX, ox)               // left edges aligned
+            bestX = consider(bestX, ox + ow - w, logX, ox + ow)      // right edges aligned
+            bestX = consider(bestX, ox + ow / 2 - w / 2, logX, ox + ow / 2)  // centres aligned
+
+            // ── Vertical: butt against the top/bottom sides, then align ────
+            bestY = consider(bestY, oy + oh, logY, oy + oh)          // our top edge ↔ their bottom edge
+            bestY = consider(bestY, oy - h,  logY, oy)               // our bottom edge ↔ their top edge
+            bestY = consider(bestY, oy,      logY, oy)               // top edges aligned
+            bestY = consider(bestY, oy + oh - h, logY, oy + oh)      // bottom edges aligned
+            bestY = consider(bestY, oy + oh / 2 - h / 2, logY, oy + oh / 2)  // centres aligned
+        }
+
+        root._guideX = bestX !== null ? bestX.guide : null
+        root._guideY = bestY !== null ? bestY.guide : null
+
+        return {
+            x: bestX !== null ? bestX.value : logX,
+            y: bestY !== null ? bestY.value : logY,
+        }
+    }
 
     // ── Bounds of all outputs ──────────────────────────────────────
     property var _bounds: {
@@ -140,6 +221,7 @@ Item {
                     offsetY:    root._offsetY
                     snapToGrid: root.snapToGrid
                     gridSize:   root.gridSize
+                    snapResolver: root._resolveSnap
 
                     onClicked: {
                         root.selectedOutput = outputData.name
@@ -149,7 +231,28 @@ Item {
                     onMoved: function(name, nx, ny) {
                         DisplayBridge.setPosition(name, nx, ny)
                     }
+                    onDragFinished: root._clearGuides()
                 }
+            }
+
+            // ── Snap guides — drawn above the blocks while dragging ────
+            Rectangle {
+                visible: root._guideX !== null
+                x: (root._guideX !== null ? root._guideX * root._fitScale + root._offsetX : 0) - 1
+                y: 0
+                width: 2
+                height: parent.height
+                color: Theme.accent
+                opacity: 0.85
+            }
+            Rectangle {
+                visible: root._guideY !== null
+                x: 0
+                y: (root._guideY !== null ? root._guideY * root._fitScale + root._offsetY : 0) - 1
+                width: parent.width
+                height: 2
+                color: Theme.accent
+                opacity: 0.85
             }
         }
     }
