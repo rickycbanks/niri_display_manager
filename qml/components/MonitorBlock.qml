@@ -12,24 +12,28 @@ Item {
     required property real offsetY
     property bool snapToGrid: false
     property int  gridSize:   10
+    // Called with (name, logicalX, logicalY) during a drag; returns {x, y}
+    // after edge-snapping against the other monitors. Set by MonitorCanvas.
+    property var snapResolver: null
 
     signal clicked()
     signal moved(string name, int newX, int newY)
+    signal dragFinished()
 
     // ── Drag state ────────────────────────────────────────────────
     property bool isDragging: false
-    property real _dragDx: 0       // accumulated screen-space drag offset X
-    property real _dragDy: 0       // accumulated screen-space drag offset Y
     property real _anchorSceneX: 0 // scene X of mouse at drag start
     property real _anchorSceneY: 0 // scene Y of mouse at drag start
     property int  _originLogX: 0   // logical pos_x at drag start
     property int  _originLogY: 0   // logical pos_y at drag start
+    property int  _dragLogX: 0     // snapped logical position under the cursor
+    property int  _dragLogY: 0
 
     // ── Position and size ─────────────────────────────────────────
-    // During drag: shift visually by screen-space delta (don't touch outputData)
+    // During drag: follow the snapped logical position (don't touch outputData)
     // On release: emit moved() once with final logical coords
-    x: outputData.pos_x * fitScale + offsetX + (isDragging ? _dragDx : 0)
-    y: outputData.pos_y * fitScale + offsetY + (isDragging ? _dragDy : 0)
+    x: (isDragging ? _dragLogX : outputData.pos_x) * fitScale + offsetX
+    y: (isDragging ? _dragLogY : outputData.pos_y) * fitScale + offsetY
     width:  outputData.logical_width  * fitScale
     height: outputData.logical_height * fitScale
     // Always visible — disabled monitors show faded so they can be re-enabled
@@ -121,8 +125,8 @@ Item {
                 root._anchorSceneY = scene.y
                 root._originLogX = outputData.pos_x
                 root._originLogY = outputData.pos_y
-                root._dragDx = 0
-                root._dragDy = 0
+                root._dragLogX = outputData.pos_x
+                root._dragLogY = outputData.pos_y
                 root.isDragging = false
             }
 
@@ -137,24 +141,35 @@ Item {
                     mouseArea.preventStealing = true
                 }
                 root.isDragging = true
-                root._dragDx = dxScreen
-                root._dragDy = dyScreen
+
+                var rawX = root._originLogX + dxScreen / root.fitScale
+                var rawY = root._originLogY + dyScreen / root.fitScale
+                if (root.snapToGrid) {
+                    rawX = Math.round(rawX / root.gridSize) * root.gridSize
+                    rawY = Math.round(rawY / root.gridSize) * root.gridSize
+                }
+                // Monitor-edge snapping wins over the grid: it is the placement
+                // the user actually cares about (no gaps, no overlaps).
+                var snapped = root.snapResolver
+                    ? root.snapResolver(outputData.name, rawX, rawY)
+                    : { x: rawX, y: rawY }
+                root._dragLogX = Math.round(snapped.x)
+                root._dragLogY = Math.round(snapped.y)
             }
 
             onReleased: function(mouse) {
                 mouseArea.preventStealing = false
                 if (root.isDragging) {
-                    var newX = root._originLogX + Math.round(root._dragDx / root.fitScale)
-                    var newY = root._originLogY + Math.round(root._dragDy / root.fitScale)
-                    if (root.snapToGrid) {
-                        newX = Math.round(newX / root.gridSize) * root.gridSize
-                        newY = Math.round(newY / root.gridSize) * root.gridSize
-                    }
-                    root.moved(outputData.name, newX, newY)
+                    root.moved(outputData.name, root._dragLogX, root._dragLogY)
                 }
                 root.isDragging = false
-                root._dragDx = 0
-                root._dragDy = 0
+                root.dragFinished()
+            }
+
+            onCanceled: {
+                mouseArea.preventStealing = false
+                root.isDragging = false
+                root.dragFinished()
             }
         }
     }
